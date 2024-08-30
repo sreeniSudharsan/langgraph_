@@ -35,4 +35,4 @@ while True:
     state = {"messages": [("user", user_input)]}
     for event in graph.stream(state):
         for value in event.values():
-            print("Assistant: ", value["messages"][].content)
+            print("Assistant: ", value["messages"][-1].content)
