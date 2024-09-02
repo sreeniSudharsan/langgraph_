@@ -1,102 +1,51 @@
-from langchain_community.tools.tavily_search import TavilySearchResults
-from dotenv import load_dotenv
-load_dotenv()
-tool = TavilySearchResults(max_results=2)
-tools = [tool]
 from typing import Annotated
-
 from langchain_cohere import ChatCohere
 from typing_extensions import TypedDict
-<<<<<<< HEAD
-from langchain_core.messages import BaseMessage
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph, START
+from dotenv import load_dotenv
+from langgraph.graph import START, END, StateGraph
 from langgraph.graph.message import add_messages
+from tool import search_tool
+import json
+from langchain_core.messages import ToolMessage
+from typing import Any, Literal
 
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 graph_builder = StateGraph(State)
+tool = [search_tool]
+load_dotenv()
 
-memory = MemorySaver()
+llm = ChatCohere(temperature=0.5, model = "command-r-plus")
+llm_with_tools = llm.bind_tools(tools=tool)
 
-llm = ChatCohere(model="command-r-plus")
-# Modification: tell the LLM which tools it can call
-llm_with_tools = llm.bind_tools(tools)
-
-
-llm = ChatCohere(model="command-r-plus")
-# Modification: tell the LLM which tools it can call
-llm_with_tools = llm.bind_tools(tools)
-
-#This maintains state within one run i.e, idea is to maintain the state between nodes, not across runs.
 def chatbot(state: State):
     return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
-
 graph_builder.add_node("chatbot", chatbot)
 
-import json
 
-from langchain_core.messages import ToolMessage
+tool_node = BasicToolNode(tools = [tool])
 
-
-class BasicToolNode:
-    """A node that runs the tools requested in the last AIMessage."""
-
-    def __init__(self, tools: list) -> None:
-        self.tools_by_name = {tool.name: tool for tool in tools}
-
-    def __call__(self, inputs: dict):
-        if messages := inputs.get("messages", []):
-            message = messages[-1]
-            print(message)
-        else:
-            raise ValueError("No message found in input")
-        outputs = []
-<<<<<<< HEAD
-        for tool_call in message['tool_calls']:
-
-            tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                tool_call["args"]
-            )
-            outputs.append(
-                ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                )
-            )
-        return {"messages": outputs}
-
-
-tool_node = BasicToolNode(tools=[tool])
 graph_builder.add_node("tools", tool_node)
 
-from typing import Literal
+def route_tools(state: State, )-> Literal["tools", "___end__"]:
+    '''
+    Use in the conditional_edge to route to the ToolNode if the last message has tool calls
+    Otherwise, route to the end
+    '''
 
-<<<<<<< HEAD
-def route_tools(
-    state: State,
-) -> Literal["tools", "__end__"]:
-    """
-    Use in the conditional_edge to route to the ToolNode if the last message
-    has tool calls. Otherwise, route to the end.
-    """
     if isinstance(state, list):
         ai_message = state[-1]
     elif messages := state.get("messages", []):
         ai_message = messages[-1]
     else:
-        raise ValueError(f"No messages found in input state to tool_edge: {state}")
-    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        raise ValueError(f"No messages found in the input state tot the tool_edge : {state}")
+    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls)> 0:
         return "tools"
     return "__end__"
 
-
-# The `tools_condition` function returns "tools" if the chatbot asks to use a tool, and "__end__" if
-# it is fine directly responding. This conditional routing defines the main agent loop.
 graph_builder.add_conditional_edges(
     "chatbot",
     route_tools,
@@ -107,20 +56,20 @@ graph_builder.add_conditional_edges(
     # e.g., "tools": "my_tools"
     {"tools": "tools", "__end__": "__end__"},
 )
+
 # Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
-<<<<<<< HEAD
-graph_builder.add_edge("__start__", "chatbot")
-graph = graph_builder.compile(checkpointer=memory)
+graph_builder.add_edge(START, "chatbot")
+graph = graph_builder.compile()
 
-config = {"configurable": {"thread_id": "1"}}
-=======
+from langchain_core.messages import BaseMessage
+
 while True:
     user_input = input("User: ")
-    if user_input.lower() in ["quit", "exit", "q"]:
+    if user_input.lower() == 'q':
         print("Goodbye!")
         break
-<<<<<<< HEAD
-    for event in graph.stream({"messages": [("user", user_input)]}, config, stream_mode="values"):
-        event["messages"][-1].pretty_print()
-=======
+    for event in graph.stream({"messages": [("user", user_input)]}):
+        for value in event.values():
+            if isinstance(value["messages"][-1], BaseMessage):
+                print("Assistant:", value["messages"][-1].content)
