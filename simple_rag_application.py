@@ -7,7 +7,8 @@ from typing import Annotated
 
 from langchain_cohere import ChatCohere
 from typing_extensions import TypedDict
-
+from langchain_core.messages import BaseMessage
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
 
@@ -18,12 +19,13 @@ class State(TypedDict):
 
 graph_builder = StateGraph(State)
 
+memory = MemorySaver()
 
 llm = ChatCohere(model="command-r-plus")
 # Modification: tell the LLM which tools it can call
 llm_with_tools = llm.bind_tools(tools)
 
-
+#This maintains state within one run i.e, idea is to maintain the state between nodes, not across runs.
 def chatbot(state: State):
     return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
@@ -44,10 +46,11 @@ class BasicToolNode:
     def __call__(self, inputs: dict):
         if messages := inputs.get("messages", []):
             message = messages[-1]
+            print(message)
         else:
             raise ValueError("No message found in input")
         outputs = []
-        for tool_call in message.tool_calls:
+        for tool_call in message['tool_calls']:
             tool_result = self.tools_by_name[tool_call["name"]].invoke(
                 tool_call["args"]
             )
@@ -65,7 +68,6 @@ tool_node = BasicToolNode(tools=[tool])
 graph_builder.add_node("tools", tool_node)
 
 from typing import Literal
-
 
 def route_tools(
     state: State,
@@ -99,17 +101,14 @@ graph_builder.add_conditional_edges(
 )
 # Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
-graph_builder.add_edge(START, "chatbot")
-graph = graph_builder.compile()
+graph_builder.add_edge("__start__", "chatbot")
+graph = graph_builder.compile(checkpointer=memory)
 
-from langchain_core.messages import BaseMessage
-
+config = {"configurable": {"thread_id": "1"}}
 while True:
     user_input = input("User: ")
     if user_input.lower() in ["quit", "exit", "q"]:
         print("Goodbye!")
         break
-    for event in graph.stream({"messages": [("user", user_input)]}):
-        for value in event.values():
-            if isinstance(value["messages"][-1], BaseMessage):
-                print("Assistant:", value["messages"][-1].content)
+    for event in graph.stream({"messages": [("user", user_input)]}, config, stream_mode="values"):
+        event["messages"][-1].pretty_print()
