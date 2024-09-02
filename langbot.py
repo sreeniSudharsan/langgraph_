@@ -7,7 +7,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_cohere import ChatCohere
 
+
 # Assuming State is imported correctly as a class
+
 class State(TypedDict):
     messages: Annotated[List, add_messages]
 
@@ -36,3 +38,4 @@ while True:
     for event in graph.stream(state):
         for value in event.values():
             print("Assistant: ", value["messages"][-1].content)
+
