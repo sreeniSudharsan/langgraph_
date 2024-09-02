@@ -7,6 +7,7 @@ from typing import Annotated
 
 from langchain_cohere import ChatCohere
 from typing_extensions import TypedDict
+<<<<<<< HEAD
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START
@@ -16,10 +17,14 @@ from langgraph.graph.message import add_messages
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
-
 graph_builder = StateGraph(State)
 
 memory = MemorySaver()
+
+llm = ChatCohere(model="command-r-plus")
+# Modification: tell the LLM which tools it can call
+llm_with_tools = llm.bind_tools(tools)
+
 
 llm = ChatCohere(model="command-r-plus")
 # Modification: tell the LLM which tools it can call
@@ -50,7 +55,9 @@ class BasicToolNode:
         else:
             raise ValueError("No message found in input")
         outputs = []
+<<<<<<< HEAD
         for tool_call in message['tool_calls']:
+
             tool_result = self.tools_by_name[tool_call["name"]].invoke(
                 tool_call["args"]
             )
@@ -69,6 +76,7 @@ graph_builder.add_node("tools", tool_node)
 
 from typing import Literal
 
+<<<<<<< HEAD
 def route_tools(
     state: State,
 ) -> Literal["tools", "__end__"]:
@@ -101,14 +109,18 @@ graph_builder.add_conditional_edges(
 )
 # Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
+<<<<<<< HEAD
 graph_builder.add_edge("__start__", "chatbot")
 graph = graph_builder.compile(checkpointer=memory)
 
 config = {"configurable": {"thread_id": "1"}}
+=======
 while True:
     user_input = input("User: ")
     if user_input.lower() in ["quit", "exit", "q"]:
         print("Goodbye!")
         break
+<<<<<<< HEAD
     for event in graph.stream({"messages": [("user", user_input)]}, config, stream_mode="values"):
         event["messages"][-1].pretty_print()
+=======
